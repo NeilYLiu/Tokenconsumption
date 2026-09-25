@@ -30,7 +30,7 @@
 | Claude Code | `settings.json` 的 `model: sonnet`、`effortLevel: medium` | 用户级 `effortLevel` 对 Opus 5.5 不生效，用 Opus 5.5 时要在 `modelSettings` 里按模型设 effort。设计决策与疑难调试时用 `/effort` 或 `/model` 临时调高 |
 | Codex CLI | `config.toml` 的 `model_reasoning_effort = "medium"` | 需要时用 `/model` 临时调高 |
 
-思考 token 按输出计费。不降档的话，规则只碰得到一小半成本。
+思考 token 按输出计费。不降档的话，规则只碰得到一小半成本。每一步具体用哪个模型见 `WORKFLOW.md` 第 6 节：默认 sonnet 中档，搜索用 haiku，只有 L 级设计和止损后的疑难定位升 opus，fable 只做最后一档。
 
 ## 安装
 

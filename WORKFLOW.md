@@ -6,7 +6,7 @@
 
 1. **三层执行，顺序不能反**：先靠配置（模型分档、并发上限），再靠工具（run-quiet、hook），最后才靠提示词里的流程约定。
 2. **阶段门禁**：每个阶段有进入条件和退出产物，没有产物不进下一步；返工只退到出问题的那一步，不从头来。
-3. **贵模型做判断，便宜模型做搬运**：澄清、设计、根因判断用主模型；搜索、跑测试、归纳失败用小模型或中档模型。
+3. **贵模型做判断，便宜模型做搬运**：搜索用 haiku，日常判断与实现用 sonnet，只有 L 级设计和止损后的疑难定位升到 opus，fable 只做最后一档。每一步的模型见第 6 节。
 4. **每次"改"之前都有一条证据**：复现、栈追踪、根因假设、失败用例，缺一条就先补证据。
 5. **轮数是止损信号，不是目标**：超过预算先停下看进度、重新分级，而不是继续试。
 
@@ -16,25 +16,25 @@
 
 ```mermaid
 flowchart TD
-  LEG[/"图例（每个节点第一行是执行者）<br/>蓝 = 主会话（主模型，中档强度）　紫 = 用户<br/>绿 = 搜索员（小模型，低强度，返回不超过 20 行）<br/>黄 = 测试执行员（中档，返回不超过 40 行）　橙 = 评审员（中档，最多 10 条）<br/>虚线 = 按条件派出并返回；同时最多 3 个子 agent"/]
-  BUDGET[/"轮数预算：S 15、M 50、L 每里程碑 50<br/>用尽即停：【主会话】写进度文件、重新分级、向用户报告"/]
+  LEG[/"图例：节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>绿 haiku 4.5（价 0.5）　蓝 sonnet 5（价 1，默认）　橙 opus 5（价 2.5，升档）　红 fable 5.1（价 5，最后一档）　紫 用户<br/>价 = 相对 sonnet 的每 token 价格；思考 token 按输出价计，强度越高越贵<br/>Codex 对应：haiku → explorer 角色 low　sonnet·中 → GPT-5.5 medium　opus·高 → GPT-5.5 high　fable → GPT-5.5 最高强度<br/>虚线 = 按条件派出并返回；同时最多 3 个子 agent"/]
+  BUDGET[/"轮数预算：S 15、M 50、L 每里程碑 50<br/>用尽即停：主会话写进度文件、重新分级、向用户报告"/]
 
-  A(["【用户】接单：提出任务"]) --> B{"【主会话】分类<br/>问题咨询 / 开发 / 修复"}
-  B -->|问题咨询| Q["【主会话】取证后回答<br/>不改代码"] --> Z
-  B -->|开发| SZ{"【主会话】分级<br/>S：不超过 3 个文件且方案唯一<br/>M：超过 3 个文件或方案不唯一<br/>L：跨模块、新子系统、迁移"}
+  A(["【用户】接单：提出任务"]) --> B{"【主会话 · sonnet · 中】分类<br/>问题咨询 / 开发 / 修复"}
+  B -->|问题咨询| Q["【主会话 · sonnet · 中】取证后回答<br/>不改代码"] --> Z
+  B -->|开发| SZ{"【主会话 · sonnet · 中】分级<br/>S：不超过 3 个文件且方案唯一<br/>M：超过 3 个文件或方案不唯一<br/>L：跨模块、新子系统、迁移"}
   B -->|修复| F1
   SZ -->|S、M| D1
-  SZ -->|L| L0["【主会话】拆里程碑<br/>每个里程碑按 M 走"] --> D1
+  SZ -->|L| L0["【主会话 · opus · 高】L 级设计 + 拆里程碑 + 验收标准<br/>跨系统架构或外部契约 → fable · 高<br/>拆完切回 sonnet，每个里程碑按 M 走"] --> D2
 
   subgraph DEV["开发轨道"]
     direction TB
-    D1["【主会话】D1 澄清 + 验收标准<br/>产物：1 到 3 行可执行的验收标准"]
+    D1["【主会话 · sonnet · 中】D1 澄清 + 验收标准<br/>产物：1 到 3 行可执行的验收标准"]
     D1U["【用户】回答歧义问题<br/>仅当不同理解会导致不同实现时才问"]
-    D2["【主会话】D2 定位 + 计划<br/>搜索限条数、只读行段<br/>M、L 写不超过 10 行计划"]
-    D2S["【搜索员】大范围搜索<br/>提示词自包含；只回 文件:行号 + 一句结论"]
-    D3["【主会话】D3 小步实现<br/>写一块验证一块<br/>脚手架、格式化、批量重命名交给命令"]
-    D4["【主会话】D4 定向验证<br/>只跑与改动直接相关的测试，经 run-quiet"]
-    D4T["【测试执行员】多条命令或长输出<br/>归纳失败：测试名、文件:行、原句"]
+    D2["【主会话 · sonnet · 中】D2 定位 + 计划<br/>搜索限条数、只读行段<br/>M、L 写不超过 10 行计划"]
+    D2S["【搜索员 Explore · haiku · 低】大范围搜索<br/>提示词自包含；只回 文件:行号 + 一句结论"]
+    D3["【主会话 · sonnet · 中】D3 小步实现<br/>写一块验证一块<br/>脚手架、格式化、批量重命名交给命令"]
+    D4["【主会话 · sonnet · 中】D4 定向验证<br/>只跑与改动直接相关的测试，经 run-quiet"]
+    D4T["【测试执行员 test-runner · sonnet · 中】多条命令或长输出<br/>归纳失败：测试名、文件:行、原句"]
     D1 -.->|有歧义| D1U -.->|一次问清| D1
     D1 --> D2
     D2 -.->|结果跨多文件、会撑大上下文| D2S -.-> D2
@@ -45,55 +45,60 @@ flowchart TD
 
   subgraph FIX["修复轨道"]
     direction TB
-    F1["【主会话】F1 复现<br/>一条最小命令，经 run-quiet<br/>有测试框架就写成失败用例"]
+    F1["【主会话 · sonnet · 中】F1 复现<br/>一条最小命令，经 run-quiet<br/>有测试框架就写成失败用例"]
     F1U["【用户】补充信息或环境<br/>复现不了时，不盲改"]
-    F2["【主会话】F2 定位 + 根因假设<br/>栈追踪 → 搜索 → 读行段<br/>一句话写出根因与改动位置"]
-    F2S["【搜索员】大范围搜索<br/>仅当栈追踪不明且涉及面很大"]
-    F3["【主会话】F3 最小修改<br/>只改根因；回归测试算范围内<br/>不顺手重构"]
-    F4["【主会话】F4 定向验证<br/>复现命令 + 相关测试，经 run-quiet"]
-    F4T["【测试执行员】多条命令或长输出<br/>归纳失败"]
-    F5["【主会话】F5 止损<br/>撤销无效修改 → 取一条新证据<br/>仍定位不了再升一档强度或模型"]
-    F6["【主会话】F6 回归<br/>相关模块测试，经 run-quiet"]
+    F2["【主会话 · sonnet · 中】F2 定位 + 根因假设<br/>栈追踪 → 搜索 → 读行段<br/>一句话写出根因与改动位置"]
+    F2S["【搜索员 Explore · haiku · 低】大范围搜索<br/>仅当栈追踪不明且涉及面很大"]
+    F3["【主会话 · sonnet · 中】F3 最小修改<br/>只改根因；回归测试算范围内<br/>不顺手重构"]
+    F4["【主会话 · sonnet · 中】F4 定向验证<br/>复现命令 + 相关测试，经 run-quiet"]
+    F4T["【测试执行员 test-runner · sonnet · 中】多条命令或长输出<br/>归纳失败"]
+    F5["【主会话 · sonnet · 中】F5 止损<br/>撤销无效修改 → 取一条新证据"]
+    F5E["【主会话 · opus · 高】升档定位<br/>取证后仍定位不了时切换（/model）<br/>带着证据重写根因假设"]
+    F5X["【主会话 · fable · 高】最后一档<br/>opus 仍定位不了时才用<br/>定位完成立刻切回 sonnet"]
+    F6["【主会话 · sonnet · 中】F6 回归<br/>相关模块测试，经 run-quiet"]
     F1 -.->|复现不了| F1U -.-> F1
     F1 --> F2
     F2 -.->|涉及面很大| F2S -.-> F2
     F2 --> F3 --> F4
     F4 -.->|输出很长或要连跑多条| F4T -.-> F4
     F4 -->|失败 1 次| F3
-    F4 -->|连续 2 次失败| F5 --> F2
+    F4 -->|连续 2 次失败| F5
+    F5 -->|有新证据| F2
+    F5 -.->|取证后仍定位不了| F5E -.->|有根因假设| F3
+    F5E -.->|仍定位不了| F5X -.->|有根因假设| F3
     F4 -->|通过| F6
   end
 
   D4 -->|验收标准全部通过| R
-  F6 --> R{"【主会话】判断是否触发评审<br/>超过 3 个文件，或触及<br/>输入处理、鉴权、并发、文件/网络/子进程"}
-  R -->|是| RV["【评审员】只派 1 次<br/>查正确性 + 安全缺陷<br/>不查风格与性能"]
-  RV -->|有缺陷| FX["【主会话】只修缺陷本身<br/>重新定向验证"] --> R
+  F6 --> R{"【主会话 · sonnet · 中】判断是否触发评审<br/>超过 3 个文件，或触及<br/>输入处理、鉴权、并发、文件/网络/子进程"}
+  R -->|是| RV["【评审员 reviewer · sonnet · 中】只派 1 次<br/>查正确性 + 安全缺陷，不查风格与性能<br/>触及鉴权、输入处理或 L 级 → opus · 中"]
+  RV -->|有缺陷| FX["【主会话 · sonnet · 中】只修缺陷本身<br/>重新定向验证"] --> R
   RV -->|无缺陷| E
   R -->|否| E
 
   subgraph END["共用收尾"]
     direction TB
-    E["【主会话】完整检查<br/>lint、类型、测试，经 run-quiet<br/>只在环境类失败时重跑 1 次"]
-    ET["【测试执行员】完整套件输出很长时<br/>归纳失败"]
-    E2["【主会话】提交<br/>做了什么 / 为什么（修复写根因）/ 怎么验证"]
-    E3["【主会话】进度文件（长任务）<br/>已完成、下一步、验证命令<br/>无效修法及证据、子 agent 结论"]
-    E4["【主会话】回复用户<br/>结论 + 验收标准逐条通过情况<br/>不复述操作，不贴代码"]
+    E["【主会话 · sonnet · 中】完整检查<br/>lint、类型、测试，经 run-quiet<br/>只在环境类失败时重跑 1 次"]
+    ET["【测试执行员 test-runner · sonnet · 中】完整套件输出很长时<br/>归纳失败"]
+    E2["【主会话 · sonnet · 中】提交<br/>做了什么 / 为什么（修复写根因）/ 怎么验证"]
+    E3["【主会话 · sonnet · 中】进度文件（长任务）<br/>已完成、下一步、验证命令<br/>无效修法及证据、子 agent 结论"]
+    E4["【主会话 · sonnet · 中】回复用户<br/>结论 + 验收标准逐条通过情况<br/>不复述操作，不贴代码"]
     E -.->|输出很长| ET -.-> E
     E --> E2 --> E3 --> E4
   end
   E4 --> Z(["【用户】确认结束<br/>新任务新开会话"])
 
-  classDef main fill:#e8eefc,stroke:#4a5b9c,color:#1b2340
+  classDef sonnet fill:#e8eefc,stroke:#4a5b9c,color:#1b2340
+  classDef haiku fill:#e6f5e9,stroke:#3d7d4d,color:#173322
+  classDef opus fill:#fde3c8,stroke:#b5641c,color:#3d2008
+  classDef fable fill:#fbd9d9,stroke:#a33,color:#3d1414
   classDef user fill:#efe6fa,stroke:#6f4aa3,color:#2a1745
-  classDef small fill:#e6f5e9,stroke:#3d7d4d,color:#173322
-  classDef tester fill:#fff4d6,stroke:#9c7a1f,color:#3a2d08
-  classDef reviewer fill:#fde3c8,stroke:#b5641c,color:#3d2008
   classDef note fill:#f4f4f4,stroke:#888,color:#333
-  class B,SZ,L0,Q,D1,D2,D3,D4,F1,F2,F3,F4,F5,F6,R,FX,E,E2,E3,E4 main
+  class B,SZ,Q,D1,D2,D3,D4,D4T,F1,F2,F3,F4,F4T,F5,F6,R,RV,FX,E,ET,E2,E3,E4 sonnet
+  class D2S,F2S haiku
+  class L0,F5E opus
+  class F5X fable
   class A,Z,D1U,F1U user
-  class D2S,F2S small
-  class D4T,F4T,ET tester
-  class RV reviewer
   class LEG,BUDGET note
 ```
 
@@ -175,16 +180,31 @@ flowchart TD
 4. 回复用户：结论、验收标准逐条的通过情况、未做的事与原因。不复述操作，不贴代码。
 5. 结束：任务完成后提醒可新开会话；不在同一会话里接无关任务。
 
-## 6. 角色与档位
+## 6. 每一步用哪个模型
 
-| 角色 | 用在哪一步 | 模型档 | 返回上限 | Claude Code | Codex |
-| --- | --- | --- | --- | --- | --- |
-| 主会话 | D1、D2 计划、D3、F2 根因、F3，以及所有判断 | 主模型，默认中档强度；设计与疑难调试临时调高 | 无 | 当前会话模型 | 当前会话模型 |
-| 搜索员 | D2、F2 的大范围搜索 | 小模型，低强度 | 20 行，超限落盘 | Explore（haiku） | explorer 角色（low） |
-| 测试执行员 | D4、F4、收尾中输出很长或多条命令时 | 中档 | 40 行，超限落盘 | test-runner（sonnet） | test-runner 角色（medium） |
-| 评审员 | D5、F6 | 中档 | 40 行，最多 10 条 | reviewer（sonnet） | reviewer 角色（medium） |
+价格按官方每百万 token 输入 / 输出：haiku 4.5 为 1 / 5，sonnet 5 为 2 / 10，opus 5 为 5 / 25（opus 5.5 为 4 / 20），fable 5.1 为 10 / 50。以 sonnet 为 1，haiku 是 0.5，opus 是 2.5，fable 是 5；思考 token 按输出价计，强度越高思考越多。分配原则：搬运用 haiku，日常判断与实现用 sonnet，只有"错了要整套返工"的判断升到 opus，fable 只做最后一档。
 
-同时最多 3 个子 agent；子 agent 只在 D2/F2、D4/F4、D5/F6 出现，其余步骤不派。
+| 步骤 | 执行者 | Claude Code | Codex | 为什么 |
+| --- | --- | --- | --- | --- |
+| 分类、分级 | 主会话 | sonnet · medium | GPT-5.5 · medium | 判断简单，错了代价小 |
+| L0 L 级设计、拆里程碑、验收标准 | 主会话 | opus · high；跨系统架构或外部契约 → fable · high | GPT-5.5 · high；最难时最高强度 | 设计错误的返工代价最大，且只做一次；拆完切回 sonnet |
+| D1 澄清与验收标准 | 主会话 | sonnet · medium | GPT-5.5 · medium | 一次问清比模型档位更重要 |
+| D2 定位与计划 | 主会话 | sonnet · medium | GPT-5.5 · medium | 计划不超过 10 行，中档足够 |
+| D2S、F2S 大范围搜索 | 搜索员 | Explore：haiku · low | explorer 角色 · low | 机械工作，返回限 20 行 |
+| D3 小步实现 | 主会话 | sonnet · medium | GPT-5.5 · medium | 小步加验证兜底 |
+| D4、F4、E 定向验证与完整检查 | 主会话 + run-quiet | sonnet · medium | GPT-5.5 · medium | 跑命令不花模型，只归纳结果 |
+| D4T、F4T、ET 归纳长输出 | 测试执行员 | test-runner：sonnet · medium | test-runner 角色 · medium | 归纳失败需要推理，haiku 漏报会让主会话重做 |
+| F1 复现、F2 定位与根因假设、F3 最小修改 | 主会话 | sonnet · medium | GPT-5.5 · medium | 有复现和证据时中档足够 |
+| F5 止损：撤销与取证 | 主会话 | sonnet · medium | GPT-5.5 · medium | 取证是机械的 |
+| F5E 取证后仍定位不了 | 主会话 | opus · high（/model 切换） | GPT-5.5 · high | 疑难定位是判断，弱模型反复试更贵 |
+| F5X opus 仍定位不了 | 主会话 | fable · high，定位完立刻切回 sonnet | GPT-5.5 最高强度 | 最后一档，只为定位，不用它写代码 |
+| R 判断是否触发评审、FX 只修缺陷 | 主会话 | sonnet · medium | GPT-5.5 · medium | 规则判定 |
+| RV 评审 | 评审员 | reviewer：sonnet · medium；触及鉴权、输入处理或 L 级 → opus · medium | reviewer 角色 · medium；同条件 high | 一次性、限 40 行，安全敏感处值得升档 |
+| E2 提交、E3 进度文件、E4 回复 | 主会话 | sonnet · medium | GPT-5.5 · medium | 文本整理 |
+
+切换方式：Claude Code 用 /model 换模型、/effort 调强度；Codex 用 /model 同时选模型与强度。升档只在 L0、F5E、F5X、安全敏感评审四处，且都写明了回到 sonnet 的时机。Codex 侧的价格没有核对，GPT-5.4 作为更便宜的替代时按同样的档位关系使用。
+
+同时最多 3 个子 agent；子 agent 只在 D2/F2、D4/F4/E、RV 出现，其余步骤不派。
 
 ## 7. 额度控制点
 

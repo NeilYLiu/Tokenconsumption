@@ -3,7 +3,8 @@
 | 通用说法 | 在 Codex 中 |
 | --- | --- |
 | 子 agent | 需在 ~/.codex/config.toml 开启多 agent 功能后由 spawn_agent 派出；未开启时第一、二节不适用。/agents、/subagents 查看 |
-| 小模型 / 中档模型 / 主模型 | 小模型 = [agents] default_subagent_model 指定的便宜模型（未填即主模型）加 low 强度；中档 = medium 强度；主模型按需，/model 可临时切换模型与强度 |
+| 小模型 / 中档 / 高档 / 最高档 | explorer 角色 low（配 default_subagent_model 指定的便宜型号，未填即主模型）/ GPT-5.5 medium（主会话默认：config 的 model_reasoning_effort=medium）/ GPT-5.5 high / GPT-5.5 最高强度（版本支持 xhigh 时用 xhigh）。Codex 侧价格未核对，GPT-5.4 作为更便宜的替代时按同样档位关系使用 |
+| 升档与回档 | /model 同时选模型与强度；升档只在 L 级设计、止损后的疑难定位、安全敏感评审三处，用完切回 medium |
 | 搜索定位的子 agent | explorer 角色（~/.codex/agents/explorer.toml，只读、low） |
 | 跑测试、评审的子 agent | test-runner、reviewer 角色（medium） |
 | 继承完整对话历史的子 agent | /fork 或 /side 开出的分支会话；spawn_agent 派出的子 agent 一律用自包含提示词 |
