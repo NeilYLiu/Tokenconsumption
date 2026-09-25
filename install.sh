@@ -47,8 +47,8 @@ write_rules() { # 目标文件 适配层...
 }
 
 merge_settings() { # 文件 hook命令 是否写主会话档位(1/0)
-  local f="$1" hook="$2" wm="$3" out
-  mkdir -p "$(dirname "$f")"; [ -f "$f" ] || echo '{}' > "$f"
+  local f="$1" hook="$2" wm="$3" out existed=1
+  mkdir -p "$(dirname "$f")"; [ -f "$f" ] || { echo '{}' > "$f"; existed=0; }
   out=$(mktemp)
   if ! jq --arg hook "$hook" --argjson wm "$wm" '
       .env = ({"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet","CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS":"3"} + (.env // {}))
@@ -60,7 +60,7 @@ merge_settings() { # 文件 hook命令 是否写主会话档位(1/0)
     ' "$f" > "$out" 2>/dev/null; then
     rm -f "$out"; echo "  $f 不是合法 JSON，未修改；请手动合并 adapters/claude-code/settings.snippet.json" >&2; return 1
   fi
-  if cmp -s "$out" "$f"; then rm -f "$out"; echo "  $f 已是最新"; else backup "$f"; mv "$out" "$f"; echo "  $f：已合并 env、hook$([ "$wm" = 1 ] && echo '、model、effortLevel')，已有的值保留"; fi
+  if cmp -s "$out" "$f"; then rm -f "$out"; echo "  $f 已是最新"; else [ "$existed" = 1 ] && backup "$f"; mv "$out" "$f"; echo "  $f：已合并 env、hook$([ "$wm" = 1 ] && echo '、model、effortLevel')，已有的值保留"; fi
 }
 
 merge_codex_config() { # 文件
