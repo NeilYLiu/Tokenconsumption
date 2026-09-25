@@ -1,0 +1,18 @@
+# 合并进 ~/.codex/config.toml。只列与额度相关的键，键名已按 Codex 仓库当前的 config.schema.json 核对。
+
+# 主会话推理强度：默认中档；设计决策与疑难调试时用 /model 临时调高。
+model_reasoning_effort = "medium"
+
+# 子 agent（多 agent 功能）是否开启由你决定，不需要就不要加下面这段。
+# [features]
+# multi_agent = true
+
+[agents]
+# spawn 时未指定强度的子 agent 一律低强度，避免继承主会话的高档设置。
+default_subagent_reasoning_effort = "low"
+# 子 agent 默认模型：留空则继承主会话模型；填一个便宜的模型名可进一步降额度。
+# default_subagent_model = ""
+# 同时最多 3 个子 agent 线程，与通用规则第二节一致。
+max_concurrent_threads_per_session = 3
+# 只允许一层子 agent，禁止子 agent 再派子 agent（多 agent V1 生效，V2 忽略此项）。
+max_depth = 1
