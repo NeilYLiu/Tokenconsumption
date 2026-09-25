@@ -1,5 +1,5 @@
 flowchart TD
-  LEG[/"图例：节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>绿 haiku 4.5（价 0.5）　蓝 sonnet 5（价 1，默认）　橙 opus 5（价 2.5，升档）　红 fable 5.1（价 5，最后一档）　紫 用户<br/>价 = 相对 sonnet 的每 token 价格；思考 token 按输出价计，强度越高越贵<br/>Codex 对应：haiku → explorer 角色 low　sonnet·中 → GPT-5.5 medium　opus·高 → GPT-5.5 high　fable → GPT-5.5 最高强度<br/>虚线 = 按条件派出并返回；同时最多 3 个子 agent"/]
+  LEG[/"图例：节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>绿 haiku 4.5（价 0.5）　蓝 sonnet 5（价 1，默认）　橙 opus 5（价 2.5，升档）　紫 用户<br/>fable 5.1（价 5）不在 Task 内部出现，只在治理层做 L 级审核与验收，见 docs/governance.svg<br/>价 = 相对 sonnet 的每 token 价格；思考 token 按输出价计，强度越高越贵<br/>Codex 对应：haiku → explorer 角色 low　sonnet·中 → GPT-5.5 medium　opus·高 → GPT-5.5 high　fable → GPT-5.5 最高强度<br/>虚线 = 按条件派出并返回；同时最多 3 个子 agent"/]
   BUDGET[/"轮数预算：S 15、M 50、L 每里程碑 50<br/>用尽即停：主会话写进度文件、重新分级、向用户报告"/]
 
   A(["【用户】接单：提出任务"]) --> B{"【主会话 · sonnet · 中】分类<br/>问题咨询 / 开发 / 修复"}
@@ -7,7 +7,7 @@ flowchart TD
   B -->|开发| SZ{"【主会话 · sonnet · 中】分级<br/>S：不超过 3 个文件且方案唯一<br/>M：超过 3 个文件或方案不唯一<br/>L：跨模块、新子系统、迁移"}
   B -->|修复| F1
   SZ -->|S、M| D1
-  SZ -->|L| L0["【主会话 · opus · 高】L 级设计 + 拆里程碑 + 验收标准<br/>跨系统架构或外部契约 → fable · 高<br/>拆完切回 sonnet，每个里程碑按 M 走"] --> D2
+  SZ -->|L| L0["【主会话 · opus · 高】L 级设计 + 拆里程碑 + 验收标准<br/>有治理流程时由 Fable 审核、Astra 出计划（GOVERNANCE.md）<br/>拆完切回 sonnet，每个里程碑按 M 走"] --> D2
 
   subgraph DEV["开发轨道"]
     direction TB
@@ -37,7 +37,7 @@ flowchart TD
     F4T["【测试执行员 test-runner · sonnet · 中】多条命令或长输出<br/>归纳失败"]
     F5["【主会话 · sonnet · 中】F5 止损<br/>撤销无效修改 → 取一条新证据"]
     F5E["【主会话 · opus · 高】升档定位<br/>取证后仍定位不了时切换（/model）<br/>带着证据重写根因假设"]
-    F5X["【主会话 · fable · 高】最后一档<br/>opus 仍定位不了时才用<br/>定位完成立刻切回 sonnet"]
+    F5X["【主会话 · sonnet · 中】标记 BLOCKED / PLAN REVISION REQUIRED<br/>opus 仍定位不了：交回计划层，见 GOVERNANCE.md 6.1"]
     F6["【主会话 · sonnet · 中】F6 回归<br/>相关模块测试，经 run-quiet"]
     F1 -.->|复现不了| F1U -.-> F1
     F1 --> F2
@@ -48,7 +48,7 @@ flowchart TD
     F4 -->|连续 2 次失败| F5
     F5 -->|有新证据| F2
     F5 -.->|取证后仍定位不了| F5E -.->|有根因假设| F3
-    F5E -.->|仍定位不了| F5X -.->|有根因假设| F3
+    F5E -.->|仍定位不了| F5X
     F4 -->|通过| F6
   end
 
@@ -74,12 +74,10 @@ flowchart TD
   classDef sonnet fill:#e8eefc,stroke:#4a5b9c,color:#1b2340
   classDef haiku fill:#e6f5e9,stroke:#3d7d4d,color:#173322
   classDef opus fill:#fde3c8,stroke:#b5641c,color:#3d2008
-  classDef fable fill:#fbd9d9,stroke:#a33,color:#3d1414
   classDef user fill:#efe6fa,stroke:#6f4aa3,color:#2a1745
   classDef note fill:#f4f4f4,stroke:#888,color:#333
-  class B,SZ,Q,D1,D2,D3,D4,D4T,F1,F2,F3,F4,F4T,F5,F6,R,RV,FX,E,ET,E2,E3,E4 sonnet
+  class B,SZ,Q,D1,D2,D3,D4,D4T,F1,F2,F3,F4,F4T,F5,F5X,F6,R,RV,FX,E,ET,E2,E3,E4 sonnet
   class D2S,F2S haiku
   class L0,F5E opus
-  class F5X fable
   class A,Z,D1U,F1U user
   class LEG,BUDGET note

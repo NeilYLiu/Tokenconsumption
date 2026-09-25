@@ -1,0 +1,64 @@
+flowchart TD
+  LEG[/"治理层流程（GOVERNANCE.md）。节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>红 Fable 5.1（价 5）　青 GPT：Astra 计划 / Sol 审核（价未核对）　橙 Opus 5.5（价 2）　蓝 Sonnet 5（价 1）　紫 用户<br/>虚线 = 按条件触发。Task 内部的步骤见 WORKFLOW.md"/]
+
+  U(["【用户】提出需求"]) --> LV{"【Sonnet · 中】分级<br/>S：不超过 3 个文件、方案唯一、不触及敏感面<br/>M：超过 3 个文件或方案不唯一或触及敏感面<br/>L：跨模块、新子系统、迁移、外部契约"}
+  LV -->|S| S1["【Sonnet · 中】自写 1 到 3 行 Acceptance Criteria<br/>写入 ARTIFACT-BOARD.md"] --> IMPL
+  LV -->|M| M1{"【Astra】需求有歧义<br/>或风险 High 以上？"}
+  M1 -->|否| PLAN
+  M1 -.->|是| FR
+  LV -->|L| FR["【Fable · 高】需求审核<br/>输入：需求 + 架构摘要 + 文件清单，不读整个仓库<br/>输出八项 + 结论（PASS 或争议项清单）"]
+  FR --> AR["【Astra】独立复核<br/>先下判断，再对照 Fable 结论"]
+  AR --> CC{"【Astra】一致？"}
+  CC -->|REVIEW PASS| PLAN
+  CC -->|有争议| CR["【Astra ↔ Fable】只谈争议项清单<br/>每轮一次文件交换，最多 3 轮"]
+  CR -->|收敛| PLAN
+  CR -->|3 轮未收敛| HB1["【用户】BLOCKED — HUMAN DECISION REQUIRED<br/>争议点、双方方案与依据、风险差异"]
+  PLAN["【Astra】Implementation Plan + 拆 Task<br/>Acceptance Criteria、依赖、Rollback<br/>建立并维护 ARTIFACT-BOARD.md"] --> IMPL
+
+  subgraph TASK["每个 Task：按看板顺序，一次只做一个"]
+    direction TB
+    IMPL["【Sonnet · 中】实现<br/>按 WORKFLOW.md 的开发 / 修复轨道<br/>不扩 Scope，不改 AC，不动无关代码"]
+    VAL["【Sonnet · 中 + run-quiet】基础验证<br/>Build、Type、Lint、Test、Runtime<br/>Evidence 只记失败与摘要"]
+    ESC["【Opus · 高】6.1 升档定位<br/>Sonnet 连续 2 次失败并取证后仍定位不了<br/>只定位，代码仍由 Sonnet 写"]
+    HB3["【Astra / Fable】BLOCKED / PLAN REVISION REQUIRED<br/>Opus 仍定位不了，或计划本身有问题"]
+    RV1["【Opus 5.5 · 中】Review<br/>输入 Review Packet：Task 条目 + diff + 测试结果 + Evidence<br/>写 reviews/T-round-opus.md，写完前不读对方"]
+    RV2["【GPT Sol · 中】Review<br/>同一 Review Packet<br/>写 reviews/T-round-gpt.md，写完前不读对方"]
+    GATE{"Gate<br/>M、L：DOUBLE PASS　S：单模型 PASS<br/>FAIL 必须带 Finding、Severity、Evidence、Required Fix"}
+    FIX["【Sonnet · 中】按 Finding 修复<br/>第 2、3 轮只复核上一轮 FAIL 项"]
+    HB2["【用户】BLOCKED — HUMAN REVIEW REQUIRED<br/>3 轮后仍有 Critical / High / Medium<br/>Low 登记为 Technical Debt"]
+    NEXT{"【Sonnet · 中】看板还有 Task？"}
+    IMPL --> VAL
+    VAL -->|失败| IMPL
+    IMPL -.->|连续 2 次失败，取证后仍定位不了| ESC
+    ESC -.->|有根因假设| IMPL
+    ESC -.->|仍定位不了| HB3
+    IMPL -.->|发现计划有问题| HB3
+    VAL -->|通过| RV1
+    VAL -->|通过，M、L 级| RV2
+    RV1 --> GATE
+    RV2 --> GATE
+    GATE -->|FAIL，未满 3 轮| FIX --> VAL
+    GATE -->|FAIL，第 3 轮| HB2
+    GATE -->|PASS，看板更新| NEXT
+  end
+  NEXT -->|有| IMPL
+  NEXT -->|无| FIN{"按分级验收"}
+  FIN -->|S| DONE
+  FIN -->|M| FA["【Astra】系统级检查<br/>需求覆盖、集成、回归、看板、债务、文档"]
+  FIN -->|L| FF["【Fable · 高 + Astra】FINAL SYSTEM REVIEW<br/>需求全覆盖、Task 全完成、集成、跨模块回归<br/>看板完整、无遗留 Blocker、债务已登记、文档同步、最终 Build/Test"]
+  FA --> DONE(["PROJECT DONE"])
+  FF --> DONE
+
+  classDef sonnet fill:#e8eefc,stroke:#4a5b9c,color:#1b2340
+  classDef opus fill:#fde3c8,stroke:#b5641c,color:#3d2008
+  classDef fable fill:#fbd9d9,stroke:#a33,color:#3d1414
+  classDef gpt fill:#d9f0ee,stroke:#1f7a74,color:#0f3d3a
+  classDef user fill:#efe6fa,stroke:#6f4aa3,color:#2a1745
+  classDef note fill:#f4f4f4,stroke:#888,color:#333
+  class LV,S1,IMPL,VAL,FIX,NEXT sonnet
+  class ESC,RV1 opus
+  class FR fable
+  class M1,AR,CC,CR,PLAN,RV2,FA,HB3 gpt
+  class FF fable
+  class U,HB1,HB2,DONE user
+  class LEG,GATE,FIN note

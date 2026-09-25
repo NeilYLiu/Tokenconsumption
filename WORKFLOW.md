@@ -1,6 +1,6 @@
 # 开发与修复整体流程
 
-一套按额度设计的端到端流程。它把 `AGENTS.md` 里的规则串成有先后、有门禁、有产物的步骤：每一步只做该步的事，进入下一步要拿出上一步的产物。适用于任何编码 agent 终端；角色名与模型档位的对应见第 6 节。
+一套按额度设计的端到端流程。它把 `AGENTS.md` 里的规则串成有先后、有门禁、有产物的步骤：每一步只做该步的事，进入下一步要拿出上一步的产物。它描述的是实施模型在一个 Task 内部怎么做；Task 之间的审核、计划、双模型对抗审核与 Gate 由 `GOVERNANCE.md` 规定。角色名与模型档位的对应见第 6 节。
 
 ## 0. 设计原则
 
@@ -16,7 +16,7 @@
 
 ```mermaid
 flowchart TD
-  LEG[/"图例：节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>绿 haiku 4.5（价 0.5）　蓝 sonnet 5（价 1，默认）　橙 opus 5（价 2.5，升档）　红 fable 5.1（价 5，最后一档）　紫 用户<br/>价 = 相对 sonnet 的每 token 价格；思考 token 按输出价计，强度越高越贵<br/>Codex 对应：haiku → explorer 角色 low　sonnet·中 → GPT-5.5 medium　opus·高 → GPT-5.5 high　fable → GPT-5.5 最高强度<br/>虚线 = 按条件派出并返回；同时最多 3 个子 agent"/]
+  LEG[/"图例：节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>绿 haiku 4.5（价 0.5）　蓝 sonnet 5（价 1，默认）　橙 opus 5（价 2.5，升档）　紫 用户<br/>fable 5.1（价 5）不在 Task 内部出现，只在治理层做 L 级审核与验收，见 docs/governance.svg<br/>价 = 相对 sonnet 的每 token 价格；思考 token 按输出价计，强度越高越贵<br/>Codex 对应：haiku → explorer 角色 low　sonnet·中 → GPT-5.5 medium　opus·高 → GPT-5.5 high　fable → GPT-5.5 最高强度<br/>虚线 = 按条件派出并返回；同时最多 3 个子 agent"/]
   BUDGET[/"轮数预算：S 15、M 50、L 每里程碑 50<br/>用尽即停：主会话写进度文件、重新分级、向用户报告"/]
 
   A(["【用户】接单：提出任务"]) --> B{"【主会话 · sonnet · 中】分类<br/>问题咨询 / 开发 / 修复"}
@@ -24,7 +24,7 @@ flowchart TD
   B -->|开发| SZ{"【主会话 · sonnet · 中】分级<br/>S：不超过 3 个文件且方案唯一<br/>M：超过 3 个文件或方案不唯一<br/>L：跨模块、新子系统、迁移"}
   B -->|修复| F1
   SZ -->|S、M| D1
-  SZ -->|L| L0["【主会话 · opus · 高】L 级设计 + 拆里程碑 + 验收标准<br/>跨系统架构或外部契约 → fable · 高<br/>拆完切回 sonnet，每个里程碑按 M 走"] --> D2
+  SZ -->|L| L0["【主会话 · opus · 高】L 级设计 + 拆里程碑 + 验收标准<br/>有治理流程时由 Fable 审核、Astra 出计划（GOVERNANCE.md）<br/>拆完切回 sonnet，每个里程碑按 M 走"] --> D2
 
   subgraph DEV["开发轨道"]
     direction TB
@@ -54,7 +54,7 @@ flowchart TD
     F4T["【测试执行员 test-runner · sonnet · 中】多条命令或长输出<br/>归纳失败"]
     F5["【主会话 · sonnet · 中】F5 止损<br/>撤销无效修改 → 取一条新证据"]
     F5E["【主会话 · opus · 高】升档定位<br/>取证后仍定位不了时切换（/model）<br/>带着证据重写根因假设"]
-    F5X["【主会话 · fable · 高】最后一档<br/>opus 仍定位不了时才用<br/>定位完成立刻切回 sonnet"]
+    F5X["【主会话 · sonnet · 中】标记 BLOCKED / PLAN REVISION REQUIRED<br/>opus 仍定位不了：交回计划层，见 GOVERNANCE.md 6.1"]
     F6["【主会话 · sonnet · 中】F6 回归<br/>相关模块测试，经 run-quiet"]
     F1 -.->|复现不了| F1U -.-> F1
     F1 --> F2
@@ -65,7 +65,7 @@ flowchart TD
     F4 -->|连续 2 次失败| F5
     F5 -->|有新证据| F2
     F5 -.->|取证后仍定位不了| F5E -.->|有根因假设| F3
-    F5E -.->|仍定位不了| F5X -.->|有根因假设| F3
+    F5E -.->|仍定位不了| F5X
     F4 -->|通过| F6
   end
 
@@ -91,13 +91,11 @@ flowchart TD
   classDef sonnet fill:#e8eefc,stroke:#4a5b9c,color:#1b2340
   classDef haiku fill:#e6f5e9,stroke:#3d7d4d,color:#173322
   classDef opus fill:#fde3c8,stroke:#b5641c,color:#3d2008
-  classDef fable fill:#fbd9d9,stroke:#a33,color:#3d1414
   classDef user fill:#efe6fa,stroke:#6f4aa3,color:#2a1745
   classDef note fill:#f4f4f4,stroke:#888,color:#333
-  class B,SZ,Q,D1,D2,D3,D4,D4T,F1,F2,F3,F4,F4T,F5,F6,R,RV,FX,E,ET,E2,E3,E4 sonnet
+  class B,SZ,Q,D1,D2,D3,D4,D4T,F1,F2,F3,F4,F4T,F5,F5X,F6,R,RV,FX,E,ET,E2,E3,E4 sonnet
   class D2S,F2S haiku
   class L0,F5E opus
-  class F5X fable
   class A,Z,D1U,F1U user
   class LEG,BUDGET note
 ```
@@ -182,12 +180,12 @@ flowchart TD
 
 ## 6. 每一步用哪个模型
 
-价格按官方每百万 token 输入 / 输出：haiku 4.5 为 1 / 5，sonnet 5 为 2 / 10，opus 5 为 5 / 25（opus 5.5 为 4 / 20），fable 5.1 为 10 / 50。以 sonnet 为 1，haiku 是 0.5，opus 是 2.5，fable 是 5；思考 token 按输出价计，强度越高思考越多。分配原则：搬运用 haiku，日常判断与实现用 sonnet，只有"错了要整套返工"的判断升到 opus，fable 只做最后一档。
+价格按官方每百万 token 输入 / 输出：haiku 4.5 为 1 / 5，sonnet 5 为 2 / 10，opus 5 为 5 / 25（opus 5.5 为 4 / 20），fable 5.1 为 10 / 50。以 sonnet 为 1，haiku 是 0.5，opus 是 2.5，fable 是 5；思考 token 按输出价计，强度越高思考越多。分配原则：搬运用 haiku，日常判断与实现用 sonnet，只有"错了要整套返工"的判断升到 opus；fable 不进入 Task 内部，只在治理层做 L 级需求审核与最终验收（GOVERNANCE.md）。
 
 | 步骤 | 执行者 | Claude Code | Codex | 为什么 |
 | --- | --- | --- | --- | --- |
 | 分类、分级 | 主会话 | sonnet · medium | GPT-5.5 · medium | 判断简单，错了代价小 |
-| L0 L 级设计、拆里程碑、验收标准 | 主会话 | opus · high；跨系统架构或外部契约 → fable · high | GPT-5.5 · high；最难时最高强度 | 设计错误的返工代价最大，且只做一次；拆完切回 sonnet |
+| L0 L 级设计、拆里程碑、验收标准 | 主会话 | opus · high；有治理流程时由 Fable 审核、Astra 出计划（GOVERNANCE.md） | GPT-5.5 · high | 设计错误的返工代价最大，且只做一次；拆完切回 sonnet |
 | D1 澄清与验收标准 | 主会话 | sonnet · medium | GPT-5.5 · medium | 一次问清比模型档位更重要 |
 | D2 定位与计划 | 主会话 | sonnet · medium | GPT-5.5 · medium | 计划不超过 10 行，中档足够 |
 | D2S、F2S 大范围搜索 | 搜索员 | Explore：haiku · low | explorer 角色 · low | 机械工作，返回限 20 行 |
@@ -197,12 +195,12 @@ flowchart TD
 | F1 复现、F2 定位与根因假设、F3 最小修改 | 主会话 | sonnet · medium | GPT-5.5 · medium | 有复现和证据时中档足够 |
 | F5 止损：撤销与取证 | 主会话 | sonnet · medium | GPT-5.5 · medium | 取证是机械的 |
 | F5E 取证后仍定位不了 | 主会话 | opus · high（/model 切换） | GPT-5.5 · high | 疑难定位是判断，弱模型反复试更贵 |
-| F5X opus 仍定位不了 | 主会话 | fable · high，定位完立刻切回 sonnet | GPT-5.5 最高强度 | 最后一档，只为定位，不用它写代码 |
+| F5X opus 仍定位不了 | 主会话 | sonnet · medium：标记 BLOCKED / PLAN REVISION REQUIRED，交回计划层（GOVERNANCE.md 6.1） | 同左 | fable 不做定位，也不写代码；它只在治理层审核与验收 |
 | R 判断是否触发评审、FX 只修缺陷 | 主会话 | sonnet · medium | GPT-5.5 · medium | 规则判定 |
 | RV 评审 | 评审员 | reviewer：sonnet · medium；触及鉴权、输入处理或 L 级 → opus · medium | reviewer 角色 · medium；同条件 high | 一次性、限 40 行，安全敏感处值得升档 |
 | E2 提交、E3 进度文件、E4 回复 | 主会话 | sonnet · medium | GPT-5.5 · medium | 文本整理 |
 
-切换方式：Claude Code 用 /model 换模型、/effort 调强度；Codex 用 /model 同时选模型与强度。升档只在 L0、F5E、F5X、安全敏感评审四处，且都写明了回到 sonnet 的时机。Codex 侧的价格没有核对，GPT-5.4 作为更便宜的替代时按同样的档位关系使用。
+切换方式：Claude Code 用 /model 换模型、/effort 调强度；Codex 用 /model 同时选模型与强度。升档只在 L0、F5E、安全敏感评审三处，且都写明了回到 sonnet 的时机。Codex 侧的价格没有核对，GPT-5.4 作为更便宜的替代时按同样的档位关系使用。
 
 同时最多 3 个子 agent；子 agent 只在 D2/F2、D4/F4/E、RV 出现，其余步骤不派。
 
