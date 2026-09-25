@@ -38,3 +38,20 @@
 
 - 没有把 Fable 从 Primary Reviewer 换成 Opus：需求审核是一次性的判断，输入小、输出小，用最强模型的绝对成本有限，且原文明确这是设计意图。分级已经把它限制在 L 级和 M 级高风险。
 - 没有把双模型审核改成单模型：M、L 级的返工代价高于一次审核；只在 S 级改为单模型。
+
+## 第二版设想（PROJECT ROUTER）的合并说明
+
+作者第二版把流程改为：PROJECT ROUTER 分新项目与既有项目；新项目走 Fable Discovery 与 Astra Discovery、Conflict Matrix、User Decisions、Requirement Freeze、Architecture Freeze；既有项目走 Issue Analysis；汇合到 Artifact Board 后 Sonnet 实现，先过 Mechanical Gate 再进 Opus 与 GPT-6 Sol 审核，PASS 进下一 Task，FAIL 进 Repair Loop。已并入 `GOVERNANCE.md` 第 0、7、11 节。
+
+| 项 | 处理 | 理由 |
+| --- | --- | --- |
+| Router 分新项目 / 既有项目 | 采纳 | 新项目的成本大头在需求与架构，值得前置投入；既有项目的成本大头在定位与返工，需要的是分级 |
+| 双 Discovery 独立进行 | 采纳 | 一次性成本，两份独立视角比模型间对话更能暴露分歧；互不看对方避免趋同 |
+| Conflict Matrix + User Decisions 替代模型间 3 轮收敛 | 采纳，并推广到 M 级审核分歧 | 3 轮模型对话每轮都是全上下文重读，矩阵由 Astra 一次合成、用户只裁决冲突项，更便宜也更可控。加了一条限制：矩阵必须逐条标注一致 / 冲突 / 仅一方提出，一致项直接冻结，只有冲突项和高风险单方项交用户，否则用户裁决量会失控 |
+| Requirement Freeze / Architecture Freeze | 采纳，并写进优先级表 | 冻结后需求变更走变更申请，堵住"Task 里悄悄改需求"这一最常见的返工来源 |
+| Mechanical Gate 前置 | 采纳 | 纯脚本、不消耗审核模型；机械门禁 FAIL 直接回 Sonnet，避免把编译不过的 diff 送给两个贵模型 |
+| Repair Loop | 采纳，沿用 3 轮上限与只复核 FAIL 项 | 与第一版第 11 节一致 |
+| 第二版图里没有的：分级、S 级单模型审核、最终验收、止损升档 | 保留修订版的做法 | Router 回答"是什么项目"，分级回答"这次改动多大"，两者正交；没有分级，既有项目的一行修复仍会走双模型审核 |
+| Issue Analysis 由谁做 | 明确为：S 级 Sonnet，M 级 Astra，L 级对受影响范围跑 Discovery | 第二版图未标执行者 |
+
+额度上的净效果：新项目前期多一份 Discovery（Fable 加 Astra 各一次），换掉最多 3 轮的模型间收敛，通常更省；Mechanical Gate 前置在每个 Task 上都省一次双模型审核的失败成本；冻结减少中途改需求的整套返工。既有项目的小修复仍靠分级省钱，Router 本身不解决这一点。

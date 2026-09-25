@@ -1,51 +1,75 @@
 flowchart TD
-  LEG[/"治理层流程（GOVERNANCE.md）。节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>红 Fable 5.1（价 5）　青 GPT：Astra 计划 / Sol 审核（价未核对）　橙 Opus 5.5（价 2）　蓝 Sonnet 5（价 1）　紫 用户<br/>虚线 = 按条件触发。Task 内部的步骤见 WORKFLOW.md"/]
+  LEG[/"治理层流程（GOVERNANCE.md，含 PROJECT ROUTER）。节点第一行 = 执行者 · 模型 · 强度；颜色 = 模型<br/>红 Fable 5.1（价 5）　青 GPT：Astra 计划 / Sol 审核（价未核对）　橙 Opus 5.5（价 2）　蓝 Sonnet 5（价 1）　紫 用户　灰 脚本或门禁<br/>虚线 = 按条件触发。Task 内部的步骤见 WORKFLOW.md"/]
 
-  U(["【用户】提出需求"]) --> LV{"【Sonnet · 中】分级<br/>S：不超过 3 个文件、方案唯一、不触及敏感面<br/>M：超过 3 个文件或方案不唯一或触及敏感面<br/>L：跨模块、新子系统、迁移、外部契约"}
-  LV -->|S| S1["【Sonnet · 中】自写 1 到 3 行 Acceptance Criteria<br/>写入 ARTIFACT-BOARD.md"] --> IMPL
-  LV -->|M| M1{"【Astra】需求有歧义<br/>或风险 High 以上？"}
-  M1 -->|否| PLAN
-  M1 -.->|是| FR
-  LV -->|L| FR["【Fable · 高】需求审核<br/>输入：需求 + 架构摘要 + 文件清单，不读整个仓库<br/>输出八项 + 结论（PASS 或争议项清单）"]
-  FR --> AR["【Astra】独立复核<br/>先下判断，再对照 Fable 结论"]
-  AR --> CC{"【Astra】一致？"}
-  CC -->|REVIEW PASS| PLAN
-  CC -->|有争议| CR["【Astra ↔ Fable】只谈争议项清单<br/>每轮一次文件交换，最多 3 轮"]
-  CR -->|收敛| PLAN
-  CR -->|3 轮未收敛| HB1["【用户】BLOCKED — HUMAN DECISION REQUIRED<br/>争议点、双方方案与依据、风险差异"]
-  PLAN["【Astra】Implementation Plan + 拆 Task<br/>Acceptance Criteria、依赖、Rollback<br/>建立并维护 ARTIFACT-BOARD.md"] --> IMPL
+  U(["【用户】提出项目或需求"]) --> RT{"【Sonnet · 中】PROJECT ROUTER<br/>新项目 / 既有项目"}
+
+  subgraph NEWP["NEW PROJECT：Discovery 轨道（一律 L 级）"]
+    direction TB
+    FD["【Fable · 高】Fable Discovery<br/>目标与非目标、需求清单、假设、架构提案、风险、未决问题<br/>写 discovery/fable.md，不看对方"]
+    AD["【Astra】Astra Discovery<br/>同一输入、同一输出格式<br/>写 discovery/astra.md，不看对方"]
+    CM["【Astra】Conflict Matrix<br/>逐条标注 一致 / 冲突 / 仅一方提出<br/>一致项直接冻结，不做模型间多轮收敛"]
+    UD["【用户】User Decisions<br/>只裁决冲突项与高风险单方项<br/>未裁决的不得进入计划"]
+    RF["【Astra】Requirement Freeze<br/>REQUIREMENTS.md；之后改需求走变更申请"]
+    AF["【Astra + Fable 复核一次】Architecture Freeze<br/>ARCHITECTURE.md；Task 不得违反"]
+    FD --> CM
+    AD --> CM
+    CM --> UD --> RF --> AF
+  end
+  RT -->|NEW PROJECT| FD
+  RT -->|NEW PROJECT| AD
+
+  subgraph EXP["EXISTING PROJECT：Issue Analysis 轨道"]
+    direction TB
+    IA["【Sonnet · 中】Issue Analysis + 分级<br/>复现、定位、影响面<br/>S：不超过 3 个文件且方案唯一　M：超过 3 个文件或方案不唯一或敏感面　L：跨模块、迁移、外部契约"]
+    SAC["【Sonnet · 中】S 级：自写 1 到 3 行 Acceptance Criteria"]
+    MP["【Astra】M 级：审核 + Implementation Plan<br/>歧义或风险 High 以上时 Fable 先审，分歧进 Conflict Matrix"]
+    LD["L 级：受影响范围跑 Discovery 轨道<br/>Fable + Astra → Conflict Matrix → 冻结增量"]
+    IA -->|S| SAC
+    IA -->|M| MP
+    IA -->|L| LD
+  end
+  RT -->|EXISTING PROJECT| IA
+
+  PLAN["【Astra】Implementation Plan + 拆 Task<br/>Acceptance Criteria、依赖、Rollback；不得与冻结冲突"]
+  AF --> PLAN
+  LD --> PLAN
+  BOARD["ARTIFACT-BOARD.md<br/>唯一状态来源：Astra 建立，Sonnet 更新状态"]
+  PLAN --> BOARD
+  MP --> BOARD
+  SAC --> BOARD
 
   subgraph TASK["每个 Task：按看板顺序，一次只做一个"]
     direction TB
-    IMPL["【Sonnet · 中】实现<br/>按 WORKFLOW.md 的开发 / 修复轨道<br/>不扩 Scope，不改 AC，不动无关代码"]
-    VAL["【Sonnet · 中 + run-quiet】基础验证<br/>Build、Type、Lint、Test、Runtime<br/>Evidence 只记失败与摘要"]
-    ESC["【Opus · 高】6.1 升档定位<br/>Sonnet 连续 2 次失败并取证后仍定位不了<br/>只定位，代码仍由 Sonnet 写"]
-    HB3["【Astra / Fable】BLOCKED / PLAN REVISION REQUIRED<br/>Opus 仍定位不了，或计划本身有问题"]
-    RV1["【Opus 5.5 · 中】Review<br/>输入 Review Packet：Task 条目 + diff + 测试结果 + Evidence<br/>写 reviews/T-round-opus.md，写完前不读对方"]
+    IMPL["【Sonnet · 中】实现<br/>按 WORKFLOW.md 的开发 / 修复轨道<br/>不扩 Scope，不改 AC，不违反冻结"]
+    MG{"Mechanical Gate（脚本，不含模型判断）<br/>Build、Type、Lint、Test、Regression、Runtime<br/>经 run-quiet；FAIL 直接回 Sonnet，不消耗审核模型"}
+    ESC["【Opus · 高】6.1 升档定位<br/>连续 2 次失败并取证后仍定位不了<br/>只定位，代码仍由 Sonnet 写"]
+    HB3["【Astra / Fable】BLOCKED / PLAN REVISION REQUIRED"]
+    RV1["【Opus 5.5 · 中】Review<br/>Review Packet：Task 条目 + diff + 门禁结果 + Evidence<br/>写 reviews/T-round-opus.md，写完前不读对方"]
     RV2["【GPT Sol · 中】Review<br/>同一 Review Packet<br/>写 reviews/T-round-gpt.md，写完前不读对方"]
-    GATE{"Gate<br/>M、L：DOUBLE PASS　S：单模型 PASS<br/>FAIL 必须带 Finding、Severity、Evidence、Required Fix"}
-    FIX["【Sonnet · 中】按 Finding 修复<br/>第 2、3 轮只复核上一轮 FAIL 项"]
-    HB2["【用户】BLOCKED — HUMAN REVIEW REQUIRED<br/>3 轮后仍有 Critical / High / Medium<br/>Low 登记为 Technical Debt"]
-    NEXT{"【Sonnet · 中】看板还有 Task？"}
-    IMPL --> VAL
-    VAL -->|失败| IMPL
+    GATE{"PASS Gate<br/>M、L：DOUBLE PASS　S：单模型 PASS<br/>FAIL 必须带 Finding、Severity、Evidence、Required Fix"}
+    RL["【Sonnet · 中】Repair Loop<br/>按 Finding 修复 → 重过 Mechanical Gate<br/>第 2、3 轮只复核 FAIL 项；最多 3 轮，S 级 2 轮"]
+    HB2["【用户】BLOCKED — HUMAN REVIEW REQUIRED<br/>轮数用尽仍有 Critical / High / Medium<br/>Low 登记为 Technical Debt"]
+    NEXT{"【Sonnet · 中】NEXT TASK？"}
+    IMPL --> MG
+    MG -->|FAIL| IMPL
     IMPL -.->|连续 2 次失败，取证后仍定位不了| ESC
     ESC -.->|有根因假设| IMPL
     ESC -.->|仍定位不了| HB3
-    IMPL -.->|发现计划有问题| HB3
-    VAL -->|通过| RV1
-    VAL -->|通过，M、L 级| RV2
+    IMPL -.->|发现计划或冻结有问题| HB3
+    MG -->|PASS| RV1
+    MG -->|PASS，M、L 级| RV2
     RV1 --> GATE
     RV2 --> GATE
-    GATE -->|FAIL，未满 3 轮| FIX --> VAL
-    GATE -->|FAIL，第 3 轮| HB2
+    GATE -->|FAIL| RL --> MG
+    GATE -->|轮数用尽仍 FAIL| HB2
     GATE -->|PASS，看板更新| NEXT
   end
+  BOARD --> IMPL
   NEXT -->|有| IMPL
   NEXT -->|无| FIN{"按分级验收"}
   FIN -->|S| DONE
   FIN -->|M| FA["【Astra】系统级检查<br/>需求覆盖、集成、回归、看板、债务、文档"]
-  FIN -->|L| FF["【Fable · 高 + Astra】FINAL SYSTEM REVIEW<br/>需求全覆盖、Task 全完成、集成、跨模块回归<br/>看板完整、无遗留 Blocker、债务已登记、文档同步、最终 Build/Test"]
+  FIN -->|L / 新项目| FF["【Fable · 高 + Astra】FINAL SYSTEM REVIEW<br/>对照 REQUIREMENTS.md 与 ARCHITECTURE.md<br/>需求全覆盖、集成、跨模块回归、看板完整、债务已登记、文档同步、最终 Build/Test"]
   FA --> DONE(["PROJECT DONE"])
   FF --> DONE
 
@@ -55,10 +79,9 @@ flowchart TD
   classDef gpt fill:#d9f0ee,stroke:#1f7a74,color:#0f3d3a
   classDef user fill:#efe6fa,stroke:#6f4aa3,color:#2a1745
   classDef note fill:#f4f4f4,stroke:#888,color:#333
-  class LV,S1,IMPL,VAL,FIX,NEXT sonnet
+  class RT,IA,SAC,IMPL,RL,NEXT sonnet
   class ESC,RV1 opus
-  class FR fable
-  class M1,AR,CC,CR,PLAN,RV2,FA,HB3 gpt
-  class FF fable
-  class U,HB1,HB2,DONE user
-  class LEG,GATE,FIN note
+  class FD,FF fable
+  class AD,CM,RF,AF,MP,LD,PLAN,RV2,FA,HB3 gpt
+  class U,UD,HB2,DONE user
+  class LEG,BOARD,MG,GATE,FIN note

@@ -16,7 +16,7 @@
 | Claude Code 适配 | `adapters/claude-code/` | `mapping.md` 术语映射；`agents/` 三个子 agent（Explore 覆盖为 haiku 只读低强度，test-runner、reviewer 用 sonnet 中档）；`settings.snippet.json` 主会话 sonnet 与 medium、子 agent 默认 sonnet、并发上限 3、hook；`hooks/filter-test-output.sh` 把清单内的测试或构建命令改写为经 run-quiet 执行 |
 | Codex 适配 | `adapters/codex/` | `mapping.md` 术语映射；`agents/` 三个角色（explorer 只读 low，test-runner、reviewer 用 medium）；`config.snippet.toml` 主会话 medium、开启多 agent、子 agent 默认 medium、并发 3、嵌套 1 |
 | 安装 | `install.sh` | 把通用正文与术语映射以带标记的段落写进各终端的规则文件（已有文件只追加、再装原位更新），用 jq 合并 settings.json、按缺失键合并 config.toml，覆盖前一律备份，结尾打印哪些已强制生效 |
-| 治理规则 | `GOVERNANCE.md`、`GOVERNANCE-REVIEW.md`、`docs/governance.svg` | 作者原设想的修订版：分级、模型角色与单价、审核与计划、看板、对抗审核、Gate、跨终端交接、度量；评审列出每处修订的理由 |
+| 治理规则 | `GOVERNANCE.md`、`GOVERNANCE-REVIEW.md`、`docs/governance.svg` | 作者设想的修订版：Project Router（新项目双 Discovery、冲突矩阵、用户裁决、需求与架构冻结；既有项目 Issue Analysis 后分级）、模型角色与单价、看板、Mechanical Gate、双模型对抗审核、PASS Gate、Repair Loop、跨终端交接、度量；评审列出每处修订的理由 |
 | 整体流程 | `WORKFLOW.md`、`docs/workflow.svg` | 把规则串成端到端流程：分级、开发轨道、修复轨道、共用收尾、角色档位、额度控制点、异常处理、度量；流程图见 docs/ |
 | 评审与评价 | `REVIEW.md`、`EVALUATION.md` | 问题清单与修正依据；对工作方式的评价与修订记录 |
 
