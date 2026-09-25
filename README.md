@@ -4,44 +4,60 @@
 目标：**在保证完成任务的前提下，把额度（token）用量压到最低。**
 适用于 Claude Code、Codex CLI 以及其他读取 AGENTS.md 的编码 agent；规则正文不绑定任何一家供应商。
 
+对这套工作方式本身的评价（六个视角独立评审、逐条对抗核验）见 [EVALUATION.md](EVALUATION.md)，评审依据见 [REVIEW.md](REVIEW.md)。
+评价里指出的问题已按其修订清单修掉，记录在 EVALUATION.md 末尾。
+
 ## 结构：一份通用正文，多个适配层
 
 | 层 | 文件 | 内容 |
 | --- | --- | --- |
 | 通用正文 | `AGENTS.md` | 全部规则，只用通用说法（子 agent、小模型 / 中档模型 / 主模型、新开会话、压缩上下文），不含任何厂商的工具名、模型名、命令名 |
-| 通用脚本 | `scripts/run-quiet.sh` | 跑测试或构建，完整输出落盘，只打印失败行、末尾摘要与退出码；任何终端都能调用 |
-| Claude Code 适配 | `adapters/claude-code/` | `mapping.md` 术语映射；`agents/` 三个子 agent 定义（Explore 覆盖为 haiku 只读，test-runner、reviewer 用 sonnet）；`settings.snippet.json` 子 agent 默认 sonnet、并发上限 3、挂 hook；`hooks/filter-test-output.sh` 自动裁剪测试输出 |
-| Codex 适配 | `adapters/codex/` | `mapping.md` 术语映射；`agents/explorer.toml` 只读低强度的探索角色；`config.snippet.toml` 推理强度与子 agent 并发、嵌套限制 |
-| 安装 | `install.sh` | 把通用正文和对应终端的术语映射拼成该终端的全局规则文件，复制子 agent 定义与脚本；已有文件先备份 |
-| 评审 | `REVIEW.md` | 评审前提、额度来源框架、问题清单与修正、有意不做的事、验证方法 |
+| 通用脚本 | `scripts/run-quiet.sh` | 包装测试或构建命令：完整输出落盘，不超过 80 行原样打印，否则只打印失败行、末尾摘要与退出码。任何终端都能调用 |
+| Claude Code 适配 | `adapters/claude-code/` | `mapping.md` 术语映射；`agents/` 三个子 agent（Explore 覆盖为 haiku 只读低强度，test-runner、reviewer 用 sonnet 中档）；`settings.snippet.json` 主会话 sonnet 与 medium、子 agent 默认 sonnet、并发上限 3、hook；`hooks/filter-test-output.sh` 把清单内的测试或构建命令改写为经 run-quiet 执行 |
+| Codex 适配 | `adapters/codex/` | `mapping.md` 术语映射；`agents/` 三个角色（explorer 只读 low，test-runner、reviewer 用 medium）；`config.snippet.toml` 主会话 medium、开启多 agent、子 agent 默认 medium、并发 3、嵌套 1 |
+| 安装 | `install.sh` | 把通用正文与术语映射以带标记的段落写进各终端的规则文件（已有文件只追加、再装原位更新），用 jq 合并 settings.json、按缺失键合并 config.toml，覆盖前一律备份，结尾打印哪些已强制生效 |
+| 评审与评价 | `REVIEW.md`、`EVALUATION.md` | 问题清单与修正依据；对工作方式的评价与修订记录 |
 
 规则正文只维护 `AGENTS.md` 这一份。改规则后重跑 `install.sh` 即可同步到各终端。
-对这种工作方式本身的评价（六个视角独立评审、逐条对抗核验后综合）见 [EVALUATION.md](EVALUATION.md)。
+
+## 第 0 步：先降主会话档位
+
+额度里最大的一块是主会话的模型与推理强度，规则文本压不到它，所以安装脚本会替你写默认值（已有的设置不动）：
+
+| 终端 | 安装脚本写入 | 说明 |
+| --- | --- | --- |
+| Claude Code | `settings.json` 的 `model: sonnet`、`effortLevel: medium` | 用户级 `effortLevel` 对 Opus 5.5 不生效，用 Opus 5.5 时要在 `modelSettings` 里按模型设 effort。设计决策与疑难调试时用 `/effort` 或 `/model` 临时调高 |
+| Codex CLI | `config.toml` 的 `model_reasoning_effort = "medium"` | 需要时用 `/model` 临时调高 |
+
+思考 token 按输出计费。不降档的话，规则只碰得到一小半成本。
 
 ## 安装
 
+全局与项目级二选一，两者都装时正文会被加载两次。
+
 ```bash
 git clone https://github.com/NeilYLiu/Tokenconsumption.git && cd Tokenconsumption
-./install.sh            # 自动检测 ~/.claude 与 ~/.codex 并各自安装；也可 ./install.sh claude 或 ./install.sh codex
+./install.sh                 # 全局：自动检测 ~/.claude 与 ~/.codex；也可 ./install.sh claude 或 ./install.sh codex
+./install.sh project ~/src/某仓库   # 项目级：写入该仓库的 AGENTS.md 与 .claude/{settings.json,agents,hooks}，云端与 Cowork 会话也能拿到强制层
 ```
 
-| 终端 | 安装后的全局规则文件 | 还需手动合并 |
-| --- | --- | --- |
-| Claude Code | `~/.claude/CLAUDE.md` = `AGENTS.md` + Claude 映射 | `adapters/claude-code/settings.snippet.json` 的 env 与 hooks 两段 → `~/.claude/settings.json` |
-| Codex CLI | `~/.codex/AGENTS.md` = `AGENTS.md` + Codex 映射 | `adapters/codex/config.snippet.toml` → `~/.codex/config.toml` |
-| 其他终端 | 把 `AGENTS.md` 复制到该工具的全局指令文件，按需补一张术语映射表 | 无 |
+脚本做的事：规则正文以 `<!-- agent-rules:begin/end -->` 标记段落写入 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md` 或项目的 `AGENTS.md`，已有内容保留；`settings.json` 用 jq 合并，缺键才写，hook 不重复；`config.toml` 按缺失键追加并校验仍是合法 TOML；agents、hooks、run-quiet 覆盖前备份。需要 bash、jq，合并 TOML 需要 python3。
 
-项目级使用：把 `AGENTS.md` 放到仓库根目录即可，Claude Code 与 Codex 都会读取。hook 与脚本需要 bash、jq。
+两点注意：hook 会把清单内的单行测试、构建、检查命令改写为经 run-quiet 执行并自动放行（`permissionDecision: allow`），等于对这些命令免审批；多行、含管道、分号、重定向、变量展开的命令原样走正常流程。清单在 hook 脚本里，可自行增删。
 
-验证：Claude Code 里 `/context` 应列出 `~/.claude/CLAUDE.md`，`/agents` 应看到 Explore、test-runner、reviewer，`/hooks` 应有 filter-test-output；Codex 里 `/status` 可看到模型、推理强度与 token 用量。
+验证：Claude Code 里 `/context` 应列出全局规则文件，`/agents` 应看到 Explore、test-runner、reviewer，`/hooks` 应有 filter-test-output；Codex 里 `/status` 可看到推理强度与 token 用量，`/agents` 可看到三个角色。
+
+## 使用习惯（规则文件管不到）
+
+- 无关任务之间新开会话（Claude Code `/clear`，Codex `/new`）。
+- 空闲超过一小时后，第一条请求会按全价重写整个上下文；上一任务已完成就新开会话，否则直接提正事，不要为"热身"多发一轮。
+- 安装前先在 `/usage` 记下一周的总量与 subagent 占比作为基线；两周后比较。没有变化先查强制层是否生效（`/hooks`、`/agents`、`/context`），再改规则措辞。
 
 ## 评审前提
 
 评审开始时本仓库为空，云端会话里也没有既有的全局规则文件，所以评审对象是各编码 agent 在没有全局规则时的默认行为，依据见 `REVIEW.md`。
-如果你本机已有一份全局规则，push 上来后可以逐条对照。
+如果你本机已有一份全局规则，push 上来后可以逐条对照；安装脚本也只会在它末尾追加本规则段落，不会替换。
 
-## 用户侧还要做的三件事（规则文件管不到）
+## 维护约定
 
-1. **强度**：默认中档，只在设计和疑难调试时调高。Claude Code 用 `/effort`；Codex 用 `model_reasoning_effort`。思考 token 按输出计费。
-2. **模型**：主会话默认中档模型，设计决策与复杂推理再切高档。子 agent 默认继承主会话模型，主会话越贵，每次派发越贵。
-3. **会话**：无关任务之间新开会话（Claude Code `/clear`，Codex `/new`）；空闲超过一小时缓存失效，回来先做小事；定期看额度归因与上下文占用（Claude Code `/usage`、`/context`，Codex `/status`）。
+`AGENTS.md` 保持在 150 行以内，只放每个会话都需要的规则；项目说明放项目级说明文件，工作流细节放按需加载的技能或命令文件。适配层只放该终端专有的术语映射与配置，不复制正文。

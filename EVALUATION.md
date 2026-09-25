@@ -82,3 +82,21 @@ P2，瘦身与度量：
 ## 7. 结论
 
 值得采用，但不是按现状装。采用方式：先降主会话档位，再装规则，把 env、hook、config 合并进安装并自检；修完 hook 的换行放行与 install.sh 的覆盖再装到有旧规则的机器，修完裁剪与两侧角色强度再推广到第二个终端。在此之前，装了等于只装了提示词约定，还会因 mapping.md 第 13 行的承诺让模型裸跑测试。应放弃或改造的情况：主要在云端/Cowork 工作且无法装适配层时，只保留正文并接受只省行为约束那一部分；两周内 /usage 的 subagent 占比与总量无变化、或返工明显增多时，先查强制层是否生效再改措辞；终端原生提供了子 agent 模型分档与输出裁剪时，适配层应退化为只保留正文与映射。
+
+## 8. 修订记录（2026-09-25）
+
+按第 5 节的修订清单逐项处理，结果如下。
+
+| 项 | 处理 | 落点 |
+| --- | --- | --- |
+| P0-1 主会话档位 | 已做。settings 片段与安装脚本写入 `model: sonnet`、`effortLevel: medium`（缺键才写，已有值保留）；Codex 写入 `model_reasoning_effort = "medium"`；README 把档位设置提到安装之前作第 0 步，并注明 Opus 5.5 需用 `modelSettings`；原"先做小事"条款改为"不为热身多发一轮"并移入 README 使用习惯 | `adapters/claude-code/settings.snippet.json`、`install.sh`、`README.md` |
+| P0-2 安装与强制层 | 已做。开头检查 jq；规则正文以标记段落追加进已有文件、再装原位更新，不整体替换；`settings.json` 用 jq 合并（env、model、effortLevel 缺键才写，hook 不重复追加）；`config.toml` 按缺失键插入并校验仍为合法 TOML；agents、hooks、run-quiet 覆盖前备份；结尾打印"已强制生效 / 仍靠提示词"；新增 `project` 模式写入仓库的 `AGENTS.md` 与 `.claude/{settings.json,agents,hooks}`，云端与 Cowork 会话可用 | `install.sh` |
+| P0-3 裁剪逻辑 | 已做。多行命令一律放行；日志改用 mktemp，并行不冲突；hook 改为调用同目录的 run-quiet，过滤模式只维护一份；命令清单补 `npm/pnpm/yarn/bun run <test|build|lint|…>`、`uv/poetry run`、`eslint`、`ruff`、`mypy`、`pyright`、`playwright test`；模式补 `error TS`、eslint 行、go 行、`Expected/Received`、pytest 的 `E` 行；不超过 80 行原样返回；匹配超过 120 行时提示"共 N 行"；映射表改为"hook 生效且命令在清单内才自动裁剪"；README 写明 allow 等于对这些命令免审批。多行放行与新模式均已复现测试 | `scripts/run-quiet.sh`、`adapters/claude-code/hooks/filter-test-output.sh`、两份 `mapping.md` |
+| P0-4 三档落地 | 已做。Codex 新增 `reviewer.toml`、`test-runner.toml`（medium，reviewer 只读沙箱）；子 agent 默认强度改为 medium，explorer 显式 low 并留出 `model` 占位；空串占位改为注释；Claude 侧 test-runner 强度改为 medium，与映射表一致。`multi_agent_v2` 一段保留：其键名来自仓库 config.schema.json，评审团未能核验是因为其环境无网络 | `adapters/codex/agents/*.toml`、`adapters/codex/config.snippet.toml`、`adapters/claude-code/agents/test-runner.md` |
+| P1-5 评审员范围与判据 | 已做。正文第一节：改动超过 3 个文件或触及输入处理、鉴权、并发、文件/网络/子进程时派一次评审员，查正确性与安全缺陷；两侧 reviewer 同步；test-runner 限定为 hook 裁剪后仍超约 100 行或需连跑多条命令的情况 | `AGENTS.md`、两侧 reviewer 与 test-runner 定义 |
+| P1-6 流程缺口 | 已做。五.1 复现写成失败用例；五.2 加根因假设；五.3 回归测试与同根因实例不算扩大范围；五.5 定义"一次失败"并先撤销无效修改；四.1 加验收标准；四.2 计划固定写文件、测试、验证命令 | `AGENTS.md` |
+| P1-7 溢出通道 | 已做。三个角色超限时落盘并返回路径与总数，首行写"共 M 项已列 N 项"；Explore 遇"所有 / 影响面 / 调用方 / 重命名"不提前停止，结论与结果矛盾要指出。Explore 用 Write 而不是 Bash 落盘，保持只读 | 六个角色定义 |
+| P2-8 瘦身 | 已做。README 写明全局与项目级二选一；REVIEW 的 3k token 改为估计并标注未实测；正文开头压成一行，第六节的用户侧条款移到 README，第七节整段删除（四条与前文重复，行数上限改为 README 的维护约定）。未把正文移到 rules/ 目录：单文件已足够短，多一层目录没有收益 | `AGENTS.md`、`README.md`、`REVIEW.md` |
+| P2-9 状态与度量 | 部分。进度文件字段补"已试过且无效的修法及其证据、已派出的子 agent 及结论"，压缩保留清单同步，"一次失败"已定义；README 与 REVIEW 加基线做法（安装前记 `/usage` 一周数据，两周后比较）。未做 hook 的 hit/miss 计数：要落盘命令特征，收益小于隐私与维护成本 | `AGENTS.md`、`README.md`、`REVIEW.md` |
+
+未采纳的一条：评价把"Codex 配置键名已按 schema 核对"降为未核验。那些键名是从 Codex 仓库当前的 `config.schema.json` 直接核对的，评审团无法复核只是因为其运行环境访问不了网络，因此保留。

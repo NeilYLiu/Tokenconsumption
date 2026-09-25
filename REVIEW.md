@@ -20,7 +20,7 @@
 | 2 | 子 agent 不指定模型时继承主会话模型，Claude Code 的内置 Explore/Plan 也如此（Explore 最高到 Opus），Codex 的角色同样继承。主会话用最贵的模型时，连搜索都在最贵的模型上跑 | 高 | 通用正文第二节按任务分档；Claude Code 覆盖 Explore 为 haiku 并以 `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` 兜底；Codex 的 explorer 角色显式指定低强度 |
 | 3 | 派发无门槛：单一事实查询、栈追踪已指明位置、两三个文件的小改也派 agent。每次派发都是一份新的提示词加一次重新探索 | 高 | 第一节"三问"与"默认不派"清单 |
 | 4 | 为"全面"并行多 agent：多维度评审、工作流编排、agent 团队；Claude Code 并发上限默认 20 | 高 | 禁止多维度评审，只派一个评审员查正确性；普通开发修复不用编排；"同时最多 3 个"与两家适配层的并发限制互为保险 |
-| 5 | 工具输出不裁剪：整文件、无限制搜索、全量 diff、完整测试与日志输出，全部留在上下文里被之后每一轮重读 | 高 | 第三节；`scripts/run-quiet.sh` 任何终端可用；Claude Code 另有 hook 在模型看到之前自动裁剪 |
+| 5 | 工具输出不裁剪：整文件、无限制搜索、全量 diff、完整测试与日志输出，全部留在上下文里被之后每一轮重读 | 高 | 第三节；`scripts/run-quiet.sh` 任何终端可用，不超过 80 行原样返回；Claude Code 另有 hook 把清单内命令改写为经 run-quiet 执行 |
 | 6 | 修复靠猜测和尝试循环：改一下跑一下，反复多次 | 高 | 第五节"两次失败即停"，先取新证据再改 |
 | 7 | 强度与模型一刀切用最高档 | 高 | 用户侧设置，规则文件管不到，见 README"用户侧三件事"；Codex 适配层给出 `model_reasoning_effort` 建议值 |
 | 8 | 子 agent 提示词不自包含：不给路径、不给已知结论，子 agent 从零重新发现；报告没有长度限制，把省下的上下文又灌回主会话 | 中 | 第二节的提示词要求与返回上限；各子 agent 定义都写死返回格式与行数上限 |
@@ -32,7 +32,7 @@
 | 14 | Claude Code 的自定义子 agent 启动时默认加载用户和项目 CLAUDE.md 与 git 状态；覆盖内置 Explore 后也会如此 | 低 | 三个 agent 文件 `omitClaudeMd: true`，所需命令与路径由提示词给出 |
 | 15 | 确定性工作（格式化、lint、批量重命名、脚手架）由模型逐行改 | 低 | 第三节交给命令 |
 | 16 | 网页或文档整页拉进上下文 | 低 | 第三节抓取必须给提取目标 |
-| 17 | 全局规则文件臃肿或混入项目说明，每个会话每一轮都在背 | 低 | 通用正文 76 行，只放每个会话都需要的规则；Claude Code 建议单文件 200 行以内，Codex 默认只读取前 32 KiB |
+| 17 | 全局规则文件臃肿或混入项目说明，每个会话每一轮都在背 | 低 | 通用正文 69 行，只放每个会话都需要的规则；Claude Code 建议单文件 200 行以内，Codex 默认只读取前 32 KiB |
 | 18 | 提交信息、PR、子 agent 提示词里带会话链接、账号、密钥等敏感信息 | 低 | 第三节脱敏条款 |
 
 ## 有意不做的事
@@ -43,7 +43,7 @@
 - **不禁用子 agent 能力**：隔离大体量输出仍是省额度的正确手段，问题在门槛和方式。
 - **Codex 的多 agent 功能按用户决定在配置片段中开启**：同时限制并发与嵌套深度，并提供低强度的探索角色；不想用时注释掉两行即可。
 - **不把项目信息写进全局文件**：那是项目级说明文件的事。
-- **hook 与脚本只改写单纯的测试或构建命令**：含管道、分号、重定向、变量展开的命令原样放行，避免误改和误放行。
+- **hook 只改写单行、单纯的测试或构建命令**：多行命令以及含管道、分号、重定向、变量展开的命令原样放行，避免误改和误放行；改写后的命令统一交给 run-quiet，过滤逻辑只维护一份。
 
 ## 规则之间的取舍
 
@@ -54,6 +54,7 @@
 
 ## 如何验证规则生效
 
-- Claude Code：新会话 `/context` 的 Memory files 含 `~/.claude/CLAUDE.md`，占用应明显小于 3k token；`/usage`（按周）里 subagent 占比应下降，Behavior flags 不应长期出现 long context；`/insights` 的 friction points 里"misunderstood requests"与"buggy code"应减少。
+- 基线：安装前先用 `/usage` 记录一周的总量与 subagent 占比，两周后比较。
+- Claude Code：新会话 `/context` 的 Memory files 含 `~/.claude/CLAUDE.md`，占用以实测为准（按字节估计约 3k token，未实测）；`/usage`（按周）里 subagent 占比应下降，Behavior flags 不应长期出现 long context；`/insights` 的 friction points 里"misunderstood requests"与"buggy code"应减少。
 - Codex：`/status` 里的 token 用量在同类任务上应下降；开启多 agent 后子线程数不应超过配置上限。
 - 任一终端：一次 bug 修复走完第五节流程后，检查会话里是否只有一次复现、一次定向验证、一次完整检查。

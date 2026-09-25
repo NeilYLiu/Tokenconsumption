@@ -1,4 +1,4 @@
-# 合并进 ~/.codex/config.toml。只列与额度相关的键，键名已按 Codex 仓库当前的 config.schema.json 核对。
+# 合并进 ~/.codex/config.toml（install.sh codex 会按缺失键自动追加）。只列与额度相关的键，键名已按 Codex 仓库当前的 config.schema.json 核对。
 
 # 主会话推理强度：默认中档；设计决策与疑难调试时用 /model 临时调高。
 model_reasoning_effort = "medium"
@@ -6,16 +6,16 @@ model_reasoning_effort = "medium"
 # 开启子 agent（多 agent 功能）。不想用时把下面两行注释掉即可，其余规则不受影响。
 [features]
 multi_agent = true
-# 若你的版本运行的是多 agent V2，并发上限改由这里控制（键名已按 schema 核对）：
-# [features.multi_agent_v2]
-# max_concurrent_threads_per_session = 3
 
 [agents]
-# spawn 时未指定强度的子 agent 一律低强度，避免继承主会话的高档设置。
-default_subagent_reasoning_effort = "low"
-# 子 agent 默认模型：留空则继承主会话模型；填一个便宜的模型名可进一步降额度。
-# default_subagent_model = ""
+# spawn 时未指定强度的子 agent 用中档；explorer 角色自己声明了 low。
+default_subagent_reasoning_effort = "medium"
+# 子 agent 默认模型：不填则继承主会话模型；填一个便宜的模型名可进一步降额度。
+# default_subagent_model = "<便宜的模型名>"
 # 同时最多 3 个子 agent 线程，与通用规则第二节一致。
 max_concurrent_threads_per_session = 3
 # 只允许一层子 agent，禁止子 agent 再派子 agent（多 agent V1 生效，V2 忽略此项）。
 max_depth = 1
+# 若你的版本启用了 multi_agent_v2，并发上限由下面这个表控制（键名来自同一份 schema）：
+# [features.multi_agent_v2]
+# max_concurrent_threads_per_session = 3
