@@ -3,9 +3,12 @@
 # 主会话推理强度：默认中档；设计决策与疑难调试时用 /model 临时调高。
 model_reasoning_effort = "medium"
 
-# 子 agent（多 agent 功能）是否开启由你决定，不需要就不要加下面这段。
-# [features]
-# multi_agent = true
+# 开启子 agent（多 agent 功能）。不想用时把下面两行注释掉即可，其余规则不受影响。
+[features]
+multi_agent = true
+# 若你的版本运行的是多 agent V2，并发上限改由这里控制（键名已按 schema 核对）：
+# [features.multi_agent_v2]
+# max_concurrent_threads_per_session = 3
 
 [agents]
 # spawn 时未指定强度的子 agent 一律低强度，避免继承主会话的高档设置。
