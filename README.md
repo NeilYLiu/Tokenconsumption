@@ -19,6 +19,7 @@
 | 治理规则 | `GOVERNANCE.md`、`GOVERNANCE-REVIEW.md`、`docs/governance.svg` | 作者设想的修订版：Project Router（新项目双 Discovery、冲突矩阵、用户裁决、需求与架构冻结；既有项目 Issue Analysis 后分级）、模型角色与单价、看板、Mechanical Gate、双模型对抗审核、PASS Gate、Repair Loop、跨终端交接、度量；评审列出每处修订的理由 |
 | 整体流程 | `WORKFLOW.md`、`docs/workflow.svg` | 把规则串成端到端流程：分级、开发轨道、修复轨道、共用收尾、角色档位、额度控制点、异常处理、度量；流程图见 docs/ |
 | 评审与评价 | `REVIEW.md`、`EVALUATION.md` | 问题清单与修正依据；对工作方式的评价与修订记录 |
+| 项目 Handoff 示例 | `docs/handoffs/griwecolor-creative-loop/` | 一份新项目开发 Handoff 按治理规则审核的样例：`original.md` 原文、`HANDOFF.md` 修订版（标注约束与提案、Project Router 入口、里程碑与可执行验收）、`HANDOFF-REVIEW.md` 逐条审核 |
 
 规则正文只维护 `AGENTS.md` 这一份。改规则后重跑 `install.sh` 即可同步到各终端。
 
