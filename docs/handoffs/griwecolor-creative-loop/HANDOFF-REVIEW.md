@@ -62,7 +62,22 @@
 | C7 | §21 | 预填六项待裁决项，用户裁决时不用从矩阵里自己找 |
 | C8 | 附录 | 术语表：区分开发侧角色（Fable、Astra、Sonnet、Opus）与运行时组件（Jev、Provider） |
 
-## D. 未改动与待用户裁决
+## D. 评审员核验后的修正（已处理）
+
+修订版写完后派一次评审员（中档模型、自包含提示词、只查一致性与保密路径）核验，8 条全部成立，已改：
+
+| # | 位置 | 缺陷 | 处理 |
+| --- | --- | --- | --- |
+| D1 | §4、§3 | 修改 / 重新生成分支直接回 BRIEFING 或 GENERATING，跳过 SECURITY_CLASSIFICATION；修改消息带入的新保密信息不会被重新分级 | 所有 revision 分支先回 SECURITY_CLASSIFICATION，级别只升不降；§3 指令表同步 |
+| D2 | §2、§7 | Intent Router 排在分类之前，却又被列为 Security Router 管辖对象，与"分类先于任何外部调用"矛盾 | Intent Router 与 PARSING 明确为本地规则 / 本地小模型，不得调用外部服务；从管辖对象列表移出 |
+| D3 | §18 M1 | M1 验收要求 COMPLETED，但到 COMPLETED 必经 WAITING_USER → APPROVED，而企微交互在 M2 才引入 | M1 的测试入口代替企微，在 WAITING_USER 自动回复"采用A"；REVIEWING、POST_PROCESSING、PUBLISHING 为直通空实现；kill 测试加 WAITING_USER |
+| D4 | §2、§4、§12 | 主链有 Final Review 节点，状态机与 §12 都没有定义状态与执行者 | 定义为 POST_PROCESSING 的退出条件，由 Production Agent 流水线执行：确定性检查 + 只看 blocking 三项的 Vision Review 复检；最多 2 次，仍不过 → PAUSED |
+| D5 | §14 | 写回分区只排除 CONFIDENTIAL，STRICT_LOCAL 资料可能被低密级任务检索到 | 四级各一分区；检索只读级别不高于当前任务的分区；STRICT_LOCAL 分区只在本地可读 |
+| D6 | §3、§5 | 绑定规则要求"候选号"，Context 只有单个 selected_candidate，没有候选列表 | Context 加 `candidates` 数组（id、revision、asset_id、review） |
+| D7 | §20 | 开发侧 DoD 引用 GOVERNANCE 第 12 节却只列 4 项 | 补全为 6 项：Implementation Completed、Acceptance Criteria Passed、Mechanical Gate Passed、Opus PASS、GPT PASS、Evidence Recorded |
+| D8 | §19.2 | "每个 Task 12 个字段"紧跟两个文件名，易读成看板也是 12 字段 | 拆成两句：`plans/` 的 Task 用第 4 节 12 字段，看板用第 5 节自己的字段集 |
+
+## E. 未改动与待用户裁决
 
 - 保留原样：§1 第一性目标；§2 原则 1 到 6；§3 示例对话；§9 动作类型与 Locator 优先级；§12 职责清单；§13 目录结构；§15 目录结构；§17 指标列表；§21 末尾的架构原则。
 - 文件名 `discovery/inventory.md`、`discovery/conflict-matrix.md` 是本次提案，治理规则只固定了 `discovery/fable.md` 与 `discovery/astra.md`；Astra 建矩阵时可改名，但要在 `ARTIFACT-BOARD.md` 里写明。

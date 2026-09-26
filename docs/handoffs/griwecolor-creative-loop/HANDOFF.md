@@ -53,8 +53,8 @@ v1.0 标题为"Codex 开发 Handoff"，让 Codex 审计、计划、实施一肩�
 主链（提案）：
 
 ``` text
-WeCom → Gateway → Intent Router → Workflow Engine
-  ├─ Security Classification（先于任何外部调用）
+WeCom → Gateway → Intent Router（本地规则 / 本地小模型，不出企业边界）→ Workflow Engine
+  ├─ Security Classification（先于任何外部调用；每个 revision 重做，级别只升不降）
   ├─ Knowledge Retrieval（按保密级过滤）
   ├─ Creative Planner（Worker 按保密级选本地 / 外部）
   ↓
@@ -67,8 +67,8 @@ Creative Brief → Prompt Builder → Generator Router（受 Security Router 约
 Candidate Pool → Vision Review
   ├─ FAIL → Revision → 再生成（最多 3 轮）
   └─ PASS，或到达上限 → 候选回传 WeCom → 用户选择 / 修改
-       ├─ 修改 → 新 revision → 再生成
-       └─ 采用 → Production Agent → Final Review → Synology/KB → WeCom
+       ├─ 修改 → 新 revision → 重新分级 → 再生成
+       └─ 采用 → Production Agent → Final Review（POST_PROCESSING 的退出条件）→ Synology/KB → WeCom
 ```
 
 # 3. 企业微信交互
@@ -97,14 +97,14 @@ Candidate Pool → Vision Review
 | 用户说 | 系统动作 | 状态变化 |
 | --- | --- | --- |
 | `采用A` | 选定候选 A | WAITING_USER → APPROVED |
-| `A背景亮一点`、`B列车环境更现代` | 以该候选为参照，只改点名的约束，其余沿用 | WAITING_USER → BRIEFING（revision + 1） |
-| `重新生成` | 同一 Brief 换种子或换 Provider 再生成 | WAITING_USER → GENERATING（revision + 1） |
-| `生成横版` | 同一 Brief 改 aspect_ratio | WAITING_USER → BRIEFING（revision + 1） |
+| `A背景亮一点`、`B列车环境更现代` | 以该候选为参照，只改点名的约束，其余沿用 | WAITING_USER → SECURITY_CLASSIFICATION → BRIEFING（revision + 1） |
+| `重新生成` | 同一 Brief 换种子或换 Provider 再生成 | WAITING_USER → SECURITY_CLASSIFICATION → GENERATING（revision + 1） |
+| `生成横版` | 同一 Brief 改 aspect_ratio | WAITING_USER → SECURITY_CLASSIFICATION → BRIEFING（revision + 1） |
 | `查看任务`、`查看原图` | 只读查询 | 不变 |
 | `停止任务` | 取消，已归档内容保留 | 任意状态 → CANCELLED |
 | 无法识别 | 追问一次，列出可选动作 | 不变 |
 
-绑定规则（约束）：每条入站消息按 `conversation_id + message_id` 找回 task_id 与当前 revision；一个会话里同时有多个未完成任务时，指令必须带任务号或候选号，否则追问一次。修改请求只改变用户点名的约束，其余从上一 revision 复制。
+绑定规则（约束）：每条入站消息按 `conversation_id + message_id` 找回 task_id 与当前 revision；一个会话里同时有多个未完成任务时，指令必须带任务号或候选号（Context.candidates 里的 id），否则追问一次。修改请求只改变用户点名的约束，其余从上一 revision 复制。
 
 # 4. Workflow 状态机 【提案】
 
@@ -115,11 +115,12 @@ RECEIVED → PARSING → SECURITY_CLASSIFICATION → CONTEXT_RETRIEVAL → BRIEF
      └─ PASS，或达上限（附最佳候选与原因）→ CANDIDATES_READY → DELIVERING → WAITING_USER
 WAITING_USER
      ├─ 采用 → APPROVED → POST_PROCESSING → ARCHIVING → PUBLISHING → COMPLETED
-     ├─ 修改 / 重新生成 / 换比例 → BRIEFING 或 GENERATING（revision + 1）
+     ├─ 修改 / 重新生成 / 换比例 → SECURITY_CLASSIFICATION（revision + 1；新消息文本与新素材重新分级，级别只升不降）
+     │      修改、换比例 → BRIEFING；重新生成 → GENERATING
      └─ 停止 → CANCELLED
 ```
 
-v1.0 把 SECURITY_CLASSIFICATION 放在 BRIEFING 之后，但 CONTEXT_RETRIEVAL 与 BRIEFING 已经把产品事实送进外部模型，已前移。WAITING_USER 是主链上的正常状态，不只是异常。
+v1.0 把 SECURITY_CLASSIFICATION 放在 BRIEFING 之后，但 CONTEXT_RETRIEVAL 与 BRIEFING 已经把产品事实送进外部模型，已前移。WAITING_USER 是主链上的正常状态，不只是异常。POST_PROCESSING 的退出条件是 Final Review 通过（第 12 节）；不通过回 Production Agent 修正，最多 2 次，仍不过 → PAUSED 转人工。
 
 异常：`RETRYING / PAUSED / FAILED / CANCELLED`。任何状态可进 PAUSED（人工介入）与 FAILED（不可恢复错误，企微返回诊断摘要）。
 
@@ -162,6 +163,7 @@ waiting_user_timeout_hours: 72    # 超时 → PAUSED 并提醒一次；不替�
  "allowed_claims": [],
  "forbidden_claims": [],
  "reference_assets": [],
+ "candidates": [{"id": "A", "revision": 1, "asset_id": "…", "review": "PASS"}],
  "selected_candidate": null
 }
 ```
@@ -189,8 +191,8 @@ STRICT_LOCAL → 只在 DGX Spark / 本地；无本地能力的步骤转人工
 ```
 
 - 级别 = max（产品、项目、参考素材、用户声明）；无法判定 → INTERNAL，不默认 PUBLIC。
-- 管辖对象是所有外部调用：意图解析、Creative Planner、Prompt Builder、Vision Review、Jev、Generator。哪一步用了哪个模型、运行在哪，写入 task metadata。
-- 分类发生在任何外部调用之前（状态机第 3 步）。
+- 管辖对象是所有外部调用：Creative Planner、Prompt Builder、Vision Review、Final Review、Jev、Generator。哪一步用了哪个模型、运行在哪，写入 task metadata。
+- 分类发生在任何外部调用之前（状态机第 3 步），每个 revision 重做，级别只升不降。因此分类之前的 Intent Router 与 PARSING 只能用本地规则或本地小模型，不得调用外部服务。
 - 降级只能由用户明确确认并留痕；系统不得自动降级。
 - 未公开客户资料、配方、结构、内部测试数据不得未经判断上传第三方。
 
@@ -299,6 +301,8 @@ Workflow → ComfyUIProvider → ComfyUI API → DGX Spark → Synology
 
 原则（约束）：**生成模型负责画面；Production Agent 负责准确文字和品牌元素。** Production Agent 是确定性流水线（模板 + 脚本），文案与参数只来自 Context.facts 中 `VERIFIED` 的条目，`UNKNOWN` 不上稿。
 
+Final Review（提案）：POST_PROCESSING 的退出条件，由 Production Agent 流水线执行，两部分：确定性检查（文案每条数字可追溯到 `facts.source_ref`、尺寸与模板合规、Logo 与文字在安全区内）；对成品复跑一次第 11 节的 Vision Review，只看 blocking 三项（保密、伪文字/Logo、产品准确性）。不通过回 Production Agent 修正，最多 2 次，仍不过 → PAUSED 转人工。
+
 # 13. Synology / Asset 【提案】
 
 ``` text
@@ -318,7 +322,7 @@ Workflow → ComfyUIProvider → ComfyUI API → DGX Spark → Synology
 
 # 14. Knowledge Feedback 【提案】
 
-任务完成后写回 task、brief、final prompt、provider、候选、采用 / 拒绝图片、reject reason、用户修改历史、final asset、publication target。允许未来复用"上次 L810 的风格"，但不得复制错误产品事实。写回按保密级分区：CONFIDENTIAL 任务的 Prompt 与图片不进 PUBLIC 任务能检索到的分区。
+任务完成后写回 task、brief、final prompt、provider、候选、采用 / 拒绝图片、reject reason、用户修改历史、final asset、publication target。允许未来复用"上次 L810 的风格"，但不得复制错误产品事实。写回按保密级分区，四级各一个分区；Knowledge Retrieval 只能读取级别不高于当前任务级别的分区，STRICT_LOCAL 分区只在本地节点可读。
 
 # 15. 推荐工程结构 【提案】
 
@@ -385,12 +389,13 @@ browser_session_id / asset_id / model（每次调用）/ cost（token 或 credit
 **M1 最小闭环（本地优先）。**
 
 ``` text
-测试入口 → Workflow Engine（持久化状态机）→ Prompt → Generator Router
-→ FakeProvider + ComfyUIProvider → 完成检测 → 图片 → Synology
+测试入口（代替企微：建任务，在 WAITING_USER 自动回复"采用A"）→ Workflow Engine（完整状态机，持久化）
+→ Prompt → Generator Router → FakeProvider + ComfyUIProvider → 完成检测 → 图片 → Synology
+M1 的 REVIEWING、POST_PROCESSING、PUBLISHING 为直通空实现，只记日志；M2 到 M5 逐个替换
 ```
 
 验收：
-- FakeProvider 连续 20 个 Job 全部 COMPLETED，无人工介入；进程在 GENERATING 与 ARCHIVING 各被 kill 一次后恢复并完成，不产生重复归档。
+- FakeProvider 连续 20 个 Job 全部走到 COMPLETED，无人工介入；进程在 GENERATING、WAITING_USER、ARCHIVING 各被 kill 一次后从持久化状态恢复并完成，不重复提交生成、不重复归档。
 - ComfyUIProvider 连续 5 个 Job 完成，图片与 task_id、revision、checksum 正确绑定。
 - 注入 TIMEOUT / GENERATION_FAILED / STORAGE_FAILED 各一次，任务进入 RETRYING 或 FAILED，诊断包完整。
 
@@ -417,7 +422,7 @@ Workflow → MidjourneyWebProvider → Jev → Playwright → MJ Web → 图片 
 # 19. 开发规则（与治理规则对齐）
 
 1.  先 Discovery，再冻结，再计划，再实施（`GOVERNANCE.md` 第 0 节）。
-2.  计划与看板是 `plans/` 与 `ARTIFACT-BOARD.md`，由 Astra 建立维护；每个 Task 12 个字段。不用 `IMPLEMENTATION_PLAN.md`。
+2.  计划在 `plans/`，每个 Task 有 `GOVERNANCE.md` 第 4 节的 12 个字段；看板是 `ARTIFACT-BOARD.md`，字段集见第 5 节。两者都由 Astra 建立维护。不用 `IMPLEMENTATION_PLAN.md`。
 3.  每个 Task：Sonnet 实现 → Mechanical Gate（build、typecheck、lint、test，全部经 run-quiet）→ Opus 与 GPT 审核模型对抗审核 → PASS Gate。Repair Loop 最多 3 轮，仍有 Critical/High/Medium 即 BLOCKED，不得虚假 PASS。
 4.  MJ DOM 逻辑不得散落业务代码。
 5.  不得用"让 GPT 自己决定下一步"替代状态机。
@@ -443,7 +448,7 @@ Workflow → MidjourneyWebProvider → Jev → Playwright → MJ Web → 图片 
 - 全链路有 task_id/trace，失败可诊断；
 - 普通员工不需要理解任何底层模型或浏览器自动化。
 
-开发侧（`GOVERNANCE.md` 第 12、14 节）：每个 Task 同时满足 Mechanical Gate PASS、Opus PASS、GPT PASS、Evidence Recorded；全部 Task PASS 后由 Fable + Astra 对照 `REQUIREMENTS.md` 与 `ARCHITECTURE.md` 做 FINAL SYSTEM REVIEW，通过才是 PROJECT DONE。
+开发侧（`GOVERNANCE.md` 第 12、14 节）：每个 Task 同时满足 Implementation Completed、Acceptance Criteria Passed、Mechanical Gate Passed、Opus PASS、GPT PASS、Evidence Recorded；全部 Task PASS 后由 Fable + Astra 对照 `REQUIREMENTS.md` 与 `ARCHITECTURE.md` 做 FINAL SYSTEM REVIEW，通过才是 PROJECT DONE。
 
 # 21. 首次执行指令（Project Router）
 
